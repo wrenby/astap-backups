@@ -13,7 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out this repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
+    - name: Install xmlstarlet
+      run: sudo apt-get install -y xmlstarlet
     - name: Check for new updates
       run: >
         # Download the RSS feed of the SourceForge folder containing the file we want
