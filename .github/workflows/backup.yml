@@ -26,7 +26,7 @@ jobs:
         if [ $(cat last_update.upstream) -gt $(cat last_update.local) ]; then 
           cp last_update.upstream last_update.local
           # If an update is available, download the new binary and commit/push it to the repo
-          curl -s "$(xmlstarlet sel -t -v 'item/link' item.xml)" > astap_amd64_qt5.tar.gz
+          curl -s -L "$(xmlstarlet sel -t -v 'item/link' item.xml)" > astap_amd64_qt5.tar.gz
           git config user.name "Automated"
           git config user.email "actions@users.noreply.github.com"
           git add astap_amd64_qt5.tar.gz last_update.local
