@@ -1,0 +1,33 @@
+name: Backup
+
+on:
+  # Picked a weird time to avoid peaks at the top of the hour
+  schedule:
+    - cron: "22 2,14 * * *"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  scheduled:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out this repo
+      uses: actions/checkout@v2
+    - name: Check for new updates
+      run: >
+        # Download the RSS feed of the SourceForge folder containing the file we want
+        curl -s "https://sourceforge.net/projects/astap-program/rss?path=/linux_installer" | grep -m 1 -B1 -A8
+        "/linux_installer/astap_amd64_qt5.tar.gz" > item.xml
+        # Compare the publication dates of the last update we downloaded with the one from the RSS feed
+        date -d "$(xmlstarlet sel -t -v 'item/pubDate' item.xml)" "+%s" > last_update.upstream
+        if [ $(cat last_update.upstream) -gt $(cat last_update.local) ]; then 
+          # If an update is available, download the new binary and commit/push it to the repo
+          curl -s "$(xmlstarlet sel -t -v 'item/link' item.xml)" > astap_amd64_qt5.tar.gz
+          git config user.name "Automated"
+          git config user.email "actions@users.noreply.github.com"
+          git add astap_amd64_qt5.tar.gz last_update.local
+          timestamp=$(date -u)
+          git commit -m "Last update: ${timestamp}" || exit 0
+          git push
+        fi
