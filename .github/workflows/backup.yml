@@ -22,7 +22,7 @@ jobs:
         curl -s "https://sourceforge.net/projects/astap-program/rss?path=/linux_installer" | grep -m 1 -B1 -A8 "/linux_installer/astap_amd64_qt5.tar.gz" > item.xml
         # Compare the publication dates of the last update we downloaded with the one from the RSS feed
         pubDate=$(xmlstarlet sel -t -v 'item/pubDate' item.xml)
-        date -d $pubDate "+%s" > last_update.upstream
+        date -d "$pubDate" "+%s" > last_update.upstream
         if [ $(cat last_update.upstream) -gt $(cat last_update.local) ]; then 
           cp last_update.upstream last_update.local
           # If an update is available, download the new binary and commit/push it to the repo
