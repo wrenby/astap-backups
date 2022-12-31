@@ -19,8 +19,7 @@ jobs:
     - name: Check for new updates
       run: >
         # Download the RSS feed of the SourceForge folder containing the file we want
-        curl -s "https://sourceforge.net/projects/astap-program/rss?path=/linux_installer" | grep -m 1 -B1 -A8
-        "/linux_installer/astap_amd64_qt5.tar.gz" > item.xml
+        curl -s "https://sourceforge.net/projects/astap-program/rss?path=/linux_installer" | grep -m 1 -B1 -A8 "/linux_installer/astap_amd64_qt5.tar.gz" > item.xml
         # Compare the publication dates of the last update we downloaded with the one from the RSS feed
         date -d "$(xmlstarlet sel -t -v 'item/pubDate' item.xml)" "+%s" > last_update.upstream
         if [ $(cat last_update.upstream) -gt $(cat last_update.local) ]; then 
