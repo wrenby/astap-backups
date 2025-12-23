@@ -18,18 +18,65 @@ jobs:
       run: sudo apt-get install -y xmlstarlet
     - name: Check for new updates
       run: |
-        # Download the RSS feed of the SourceForge folder containing the file we want
-        curl -s "https://sourceforge.net/projects/astap-program/rss?path=/linux_installer" | grep -m 1 -B1 -A8 "/linux_installer/astap_amd64_qt5.tar.gz" > item.xml
-        # Compare the publication dates of the last update we downloaded with the one from the RSS feed
-        pubDate=$(xmlstarlet sel -t -v 'item/pubDate' item.xml)
-        date -d "$pubDate" "+%s" > last_update.upstream
-        if [ $(cat last_update.upstream) -gt $(cat last_update.local) ]; then 
-          cp last_update.upstream last_update.local
-          # If an update is available, download the new binary and commit/push it to the repo
-          curl -s -L "$(xmlstarlet sel -t -v 'item/link' item.xml)" > astap_amd64_qt5.tar.gz
-          git config user.name "Automated"
-          git config user.email "actions@users.noreply.github.com"
-          git add astap_amd64_qt5.tar.gz last_update.local
-          git commit -m "Last update: ${pubDate}" || exit 0
-          git push
-        fi
+        set -e
+
+        function parse_release {
+            local ARTIFACT=$1
+            local OUTPUT=$2
+            # link the local variable __resultvar to the variable named $OUTPUT in the calling scope
+            declare -n __resultvar="$OUTPUT"
+            __resultvar=()
+        
+            while IFS== read -r key value; do
+                __resultvar[$key]=$value
+            done < <(xmlstarlet select \
+                -N media="http://video.search.yahoo.com/mrss/" \
+                -t \
+                -m "/rss/channel/item[
+                        contains(title, '$ARTIFACT')
+                        and not(contains(title,'/older/'))
+                    ]" \
+                -s A:T:U pubDate \
+                -o 'date=' -v "pubDate" -o $'\n' \
+                -o 'url=' -v "media:content/@url" -o $'\n' \
+                -o 'md5=' -v "media:content/media:hash[@algo='md5']"\
+                -n \
+                releases.rss | head -n3)
+            echo "$ARTIFACT: {"
+            for key in ${!__resultvar[@]}
+            do
+                echo "    ${key}: ${__resultvar[${key}]}"
+            done
+            echo '}'
+        }
+        
+        function update_if_new {
+            ARCH=$1
+            declare -n __info=$ARCH
+        
+            local base=astap_${ARCH}_qt5.tar.gz
+            # verify that: file and hash both exist, and that the local hash matches the upstream hash
+            if [ -f $base ] && [ -f ${base}.md5 ] && [[ "$(awk '{print $1; exit}' ${base}.md5)" = "${__info[md5]}" ]]; then
+                echo "Already at newest release"
+            else
+                echo "Update available! Downloading now..."
+                curl -s -L "${__info[url]}" -o $base
+                echo "${__info[md5]} $base" > ${base}.md5
+                md5sum -c ${base}.md5
+                git add $base ${base}.md5
+                git commit -m "Update $ARCH to ${__info[date]}"
+            fi
+        }
+        
+        git config user.name "Automated"
+        git config user.email "actions@users.noreply.github.com"
+        
+        curl -s -L "https://sourceforge.net/projects/astap-program/rss?path=/linux_installer" -o releases.rss
+        
+        for arch in amd64 aarch64; do
+            declare -A $arch
+            parse_release astap_${arch}_qt5 $arch
+            update_if_new $arch
+        done
+        
+        git push
